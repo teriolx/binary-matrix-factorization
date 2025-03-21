@@ -8,16 +8,21 @@ from scipy.special import expit
 from common import construct_adjacency_matrix, time_wrapper
 
 
-def lpca_loss(factors, adj_s, rank): # adj_s = shifted adj with -1's and +1's
+def lpca_loss(factors, adj_s, rank, V_fixed=None): # adj_s = shifted adj with -1's and +1's
     n_row, n_col = adj_s.shape
     U = factors[:n_row*rank].reshape(n_row, rank)
-    V = factors[n_row*rank:].reshape(rank, n_col)
-    logits = U @ V
+    V = factors[n_row*rank:].reshape(rank, n_col) if V_fixed is None else V_fixed
+    logits = U @ V[:, :n_row]
     prob_wrong = expit(-logits * adj_s)
     loss = (np.logaddexp(0,-logits*adj_s)).sum()# / n_element    
-    U_grad = -(prob_wrong * adj_s) @ V.T# / n_element
+    U_grad = -(prob_wrong * adj_s) @ V[:, :n_row].T# / n_element
+
+    if V_fixed is not None:
+        return loss, U_grad.flatten()
+    
     V_grad = -U.T @ (prob_wrong * adj_s)# / n_element
-    return loss, np.concatenate((U_grad.flatten(), V_grad.flatten()))
+
+    return loss, np.concatenate((U_grad.flatten(), V_grad.flatten())) 
 
 def lpca_loss_fixed(factors, adj_s, rank, S): # adj_s = shifted adj with -1's and +1's
     # S is the fixed matrix of size rank/rank
@@ -35,16 +40,22 @@ def lpca_loss_fixed(factors, adj_s, rank, S): # adj_s = shifted adj with -1's an
 clip_01 = lambda M : np.clip(M, a_min=0, a_max=1)
 
 @time_wrapper
-def decomposition_at_k(A, k, save_path=None, max_iter=2000):
+def decomposition_at_k(A, k, save_path=None, fixed_V=None, max_iter=2000):
     n, _ = A.shape
 
-    factors = -1+2*np.random.random(size=2*n*k) # initalize uniformly on [-1,+1]
-    res = scipy.optimize.minimize(lpca_loss, x0=factors, 
+    # initalize uniformly on [-1,+1]
+    size = 2*n*k if fixed_V is None else n*k
+    factors = -1+2*np.random.random(size=size)
+    
+    res = scipy.optimize.minimize(lambda x, adj_s, rank: lpca_loss(x, adj_s, rank, fixed_V), x0=factors, 
                             args=(-1 + 2*np.array(A.todense()), k), jac=True, method='L-BFGS-B',
                             options={'maxiter':max_iter})
-    U = res.x[:n*k].reshape(n, k)
-    V = res.x[n*k:].reshape(k, n)
-    frob_error_norm = np.linalg.norm(clip_01(U@V) - A) / sp.sparse.linalg.norm(A)
+    
+    U = res.x[:n*k].reshape(n, k) 
+    V = res.x[n*k:].reshape(k, n) if fixed_V is None else fixed_V
+    A_reconstructed = clip_01(U@V)
+
+    frob_error_norm = np.linalg.norm(A_reconstructed[:,:n] - A) / sp.sparse.linalg.norm(A)
 
     if save_path is not None:
         data = {'U':U, 'V':V, 'A': A}
