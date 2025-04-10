@@ -3,9 +3,9 @@ https://github.com/schariya/exact-embeddings/blob/master/ExactEmbeddings.ipynb
 """
 import numpy as np
 import scipy as sp
-import scipy.sparse, scipy.io, scipy.optimize
+import scipy.io, scipy.optimize
 from scipy.special import expit
-from common import construct_adjacency_matrix, time_wrapper
+from common import time_wrapper
 
 
 def lpca_loss(factors, adj_s, rank, V_fixed=None): # adj_s = shifted adj with -1's and +1's
@@ -40,7 +40,7 @@ def lpca_loss_fixed(factors, adj_s, rank, S): # adj_s = shifted adj with -1's an
 clip_01 = lambda M : np.clip(M, a_min=0, a_max=1)
 
 @time_wrapper
-def decomposition_at_k(A, k, save_path=None, fixed_V=None, max_iter=2000):
+def decomposition_at_k(A, k, save_path=None, fixed_V=None, max_iter=2000, bounds=None):
     n, _ = A.shape
 
     # initalize uniformly on [-1,+1]
@@ -49,7 +49,7 @@ def decomposition_at_k(A, k, save_path=None, fixed_V=None, max_iter=2000):
     
     res = scipy.optimize.minimize(lambda x, adj_s, rank: lpca_loss(x, adj_s, rank, fixed_V), x0=factors, 
                             args=(-1 + 2*np.array(A.todense()), k), jac=True, method='L-BFGS-B',
-                            options={'maxiter':max_iter})
+                            options={'maxiter':max_iter}, bounds=bounds)
     
     U = res.x[:n*k].reshape(n, k) 
     V = res.x[n*k:].reshape(k, n) if fixed_V is None else fixed_V
@@ -57,10 +57,11 @@ def decomposition_at_k(A, k, save_path=None, fixed_V=None, max_iter=2000):
 
     frob_error_norm = np.linalg.norm(A_reconstructed[:,:n] - A) / sp.sparse.linalg.norm(A)
 
+    data = {'U':U, 'V':V, 'A': A}
+
     if save_path is not None:
-        data = {'U':U, 'V':V, 'A': A}
         scipy.io.savemat(save_path, data)
-    return frob_error_norm, res.nit
+    return frob_error_norm, res.nit, data
 
 
 @time_wrapper
