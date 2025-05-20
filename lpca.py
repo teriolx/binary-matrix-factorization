@@ -47,9 +47,10 @@ def decomposition_at_k(A, k, save_path=None, fixed_V=None, max_iter=2000, bounds
     size = 2*n*k if fixed_V is None else n*k
     factors = -1+2*np.random.random(size=size)
     
+    bounds_list = [bounds for _ in range(len(factors))] if bounds is not None else None
     res = scipy.optimize.minimize(lambda x, adj_s, rank: lpca_loss(x, adj_s, rank, fixed_V), x0=factors, 
                             args=(-1 + 2*np.array(A.todense()), k), jac=True, method='L-BFGS-B',
-                            options={'maxiter':max_iter}, bounds=bounds)
+                            options={'maxiter':max_iter}, bounds=bounds_list)
     
     U = res.x[:n*k].reshape(n, k) 
     V = res.x[n*k:].reshape(k, n) if fixed_V is None else fixed_V
