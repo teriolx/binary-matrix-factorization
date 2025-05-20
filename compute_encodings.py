@@ -13,24 +13,22 @@ def format_LPCA_encoding(data):
 def format_LPCA_encoding_fixed(data):
     return data['U']
 
-def compute_encoding(graph, k, format_fun):
-    A = sp.sparse.csr_matrix(construct_adjacency_matrix(graph))
-
-    _, _, _, res = decomposition_at_k(A, k)
-    return format_fun(res)
-
 
 def save_encodings(matrices, out_path):
     names = [f"idx_{i}" for i in range(len(matrices))]
     np.savez_compressed(out_path, **dict(zip(names, matrices)))
 
 
-def compute_encodings(data, k, out_path, format_fun, bounds=None, V=None):
+def compute_encodings(data, k, out_path, format_fun, bounds=None, V=None, n_hops=1):
     matrices = {}
     results = []
 
     for i in tqdm(range(len(data))):
         A = sp.sparse.csr_matrix(construct_adjacency_matrix(data[i]))
+
+        while n_hops > 1:
+            A = A @ A
+            n_hops -= 1
 
         t, error, nit, res = decomposition_at_k(A, k, None, V, 5000, bounds)
         matrices[f"idx_{i}"] = format_fun(res)
@@ -60,5 +58,7 @@ if __name__ == "__main__":
     # N = 40
     # k = 16
     # V = lb+ub+1*np.random.random(size=N*k).reshape((k, N))
-    compute_encodings(data, 2, 'lpca_out/lpca2b_4_4', format_LPCA_encoding, bounds)
+    #compute_encodings(data, 2, 'lpca_out/lpca2b_4_4', format_LPCA_encoding, bounds)
+
+    compute_encodings(data, 4, 'lpca_out/lpca4b_4_4_2hop', format_LPCA_encoding, bounds, None, 2)
     
