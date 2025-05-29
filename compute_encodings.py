@@ -5,6 +5,8 @@ from common import construct_adjacency_matrix
 from lpca import decomposition_at_k
 from tqdm import tqdm
 from torch_geometric.datasets import ZINC
+from torch_geometric.datasets import GNNBenchmarkDataset
+import sys
 
 
 def format_LPCA_encoding(data):
@@ -46,19 +48,52 @@ def compute_encodings(data, k, out_path, format_fun, bounds=None, V=None, n_hops
     pd.DataFrame(results).to_parquet(out_path + '.parquet')
 
 
-if __name__ == "__main__":
-    train = ZINC(subset=True, root='data', split='train')
-    val   = ZINC(subset=True, root='data', split='val')
-    test  = ZINC(subset=True, root='data', split='test')
-
-    data = train + val + test 
+def load_dataset(name):
+    train, val, test = None, None, None
+    if name == "ZINC":
+        train = ZINC(subset=True, root='data', split='train')
+        val   = ZINC(subset=True, root='data', split='val')
+        test  = ZINC(subset=True, root='data', split='test')
+    elif name == "CIFAR":
+        train = GNNBenchmarkDataset(name='CIFAR10', root='data', split='train')
+        val   = GNNBenchmarkDataset(name='CIFAR10', root='data', split='val')
+        test  = GNNBenchmarkDataset(name='CIFAR10', root='data', split='test')    
     
-    bounds = (-4, 4)
+    if train is not None and val is not None and test is not None:
+        return train + val + test 
+    return None
+
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Please provide the dataset name.")
+        exit()
+    
+    if len(sys.argv) < 3:
+        print("Please provide the bounds range.")
+        exit()
+
+    if len(sys.argv) < 4:
+        print("Please provide the dimension k.")
+        exit()
+
+    name = sys.argv[1]
+    data = load_dataset(name)
+    bounds = (-int(sys.argv[2]), sys.argv[2])
+    k = int(sys.argv[3])
+    n_hops = 1
+    
+    if len(sys.argv) > 4:
+        n_hops = int(sys.argv[4])
+
     # lb, ub = bounds
     # N = 40
     # k = 16
     # V = lb+ub+1*np.random.random(size=N*k).reshape((k, N))
     #compute_encodings(data, 2, 'lpca_out/lpca2b_4_4', format_LPCA_encoding, bounds)
 
-    compute_encodings(data, 4, 'lpca_out/lpca4b_4_4_2hop', format_LPCA_encoding, bounds, None, 2)
+    out_path = f'lpca_out/lpca_{name}_{k}_b{bounds[1]}_{n_hops}hop'
+    print("Computing LPCA:", out_path)
+    
+    compute_encodings(data, k, out_path, format_LPCA_encoding, bounds, None, n_hops)
     
