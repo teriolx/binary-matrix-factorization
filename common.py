@@ -1,6 +1,7 @@
 import time
 import torch
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def construct_adjacency_matrix(data):
@@ -34,3 +35,35 @@ def plot_nodes_error_k(data, k_list):
     plt.ylabel("Relative Reconstruction Error")
     plt.legend()
     plt.show()
+
+
+def neighbourhood_symmetric_difference(u_neigh, v_neigh):
+    return np.sum(np.bitwise_xor(u_neigh, v_neigh))
+
+
+def measure_encoding_similarity(A, encodings):
+    similarity = {}
+    n_nodes = A.shape[0]
+
+    for v in range(n_nodes):
+        for w in range(n_nodes):
+            if v == w:
+                continue
+            d = neighbourhood_symmetric_difference(A[v], A[w])
+            
+            if not d in similarity:
+                similarity[d] = []
+            similarity[d].append(np.linalg.norm(encodings[v] - encodings[w]))
+    
+    return similarity
+
+
+
+if __name__ == "__main__":
+    u = np.array([0, 1, 1, 0, 0, 1, 0, 1])
+    v = np.array([0, 0, 1, 0, 1, 0, 0, 1])
+    w = np.array([0, 0, 1, 0, 1, 1, 1, 1])
+    assert neighbourhood_symmetric_difference(u, v) == 3
+    assert neighbourhood_symmetric_difference(u, w) == 3
+    assert neighbourhood_symmetric_difference(w, v) == 2
+    assert neighbourhood_symmetric_difference(v, v) == 0
