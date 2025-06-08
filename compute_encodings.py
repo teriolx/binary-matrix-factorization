@@ -110,5 +110,7 @@ if __name__ == "__main__":
     out_path = f'lpca_out/lpca_{name}_{k}_b{bounds[1] if bounds is not None else "N"}_{n_hops}hop_single{is_single}_fixedK{fixed_k is not None}'
     print("Computing LPCA:", out_path)
     
-    compute_encodings(data, k, out_path, format_LPCA_encoding, bounds, None, n_hops, is_single, fixed_k)
+    compute_encodings(data, k, out_path, 
+                      format_LPCA_encoding if fixed_k is None else format_LPCA_encoding_fixed, 
+                      bounds, None, n_hops, is_single, fixed_k)
     
