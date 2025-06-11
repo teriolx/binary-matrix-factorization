@@ -21,9 +21,11 @@ def save_encodings(matrices, out_path):
     np.savez_compressed(out_path, **dict(zip(names, matrices)))
 
 
-def compute_encodings(data, k, out_path, format_fun, bounds=None, V=None, n_hops=1, is_single=False, fixed_k=None):
+def compute_encodings(data, k, out_path, format_fun, config):
     matrices = {}
     results = []
+
+    n_hops = config["n_hops"]
 
     for i in tqdm(range(len(data))):
         A = sp.sparse.csr_matrix(construct_adjacency_matrix(data[i]))
@@ -32,7 +34,7 @@ def compute_encodings(data, k, out_path, format_fun, bounds=None, V=None, n_hops
             A = A @ A
             n_hops -= 1
 
-        t, error, nit, res = decomposition_at_k(A, k, None, V, 5000, bounds, is_single, fixed_k)
+        t, error, nit, res = decomposition_at_k(A, k, config)
         matrices[f"idx_{i}"] = format_fun(res)
         results.append(
             {
@@ -79,23 +81,31 @@ if __name__ == "__main__":
 
     name = sys.argv[1]
     data = load_dataset(name)
-    if sys.argv[2] == "None":
-        bounds = None
-    else:
-        bounds = (-int(sys.argv[2]), sys.argv[2])
+
+    config = {
+        "n_hops": 1,
+        "is_single": False,
+        "fixed_V": None,
+        "bounds": None,
+        "max_iter": 5000
+    }
+
+    if sys.argv[2].lower() != "none":
+        config["bounds"] = (-int(sys.argv[2]), sys.argv[2])
+    
     k = int(sys.argv[3])
-    n_hops = 1
-    is_single=False
-    fixed_k = None
     
     if len(sys.argv) > 4:
-        n_hops = int(sys.argv[4])
+        config["n_hops"] = int(sys.argv[4])
 
     if len(sys.argv) > 5:
-        is_single = sys.argv[5]
+        config["is_single"] = sys.argv[5]
 
-    if len(sys.argv) > 6 and sys.argv[6]:
-        fixed_k = -1+2*np.random.random(size=k*k).reshape((k, k))
+    if len(sys.argv) > 6 and sys.argv[6] == "True":
+        config["fixed_V"] = -1+2*np.random.random(size=k*k).reshape((k, k))
+    
+    if len(sys.argv) > 7:
+        config["p_lambda"] = float(sys.argv[7])
 
     # lb, ub = bounds
     # N = 40
@@ -105,12 +115,10 @@ if __name__ == "__main__":
 
     # python compute_encodings.py ZINC 4 16 1 False True
 
-    print(fixed_k.shape)
-
-    out_path = f'lpca_out/lpca_{name}_{k}_b{bounds[1] if bounds is not None else "N"}_{n_hops}hop_single{is_single}_fixedK{fixed_k is not None}'
+    out_path = f"lpca_out/lpca_{name}_{k}_b{config['bounds'][1] if config['bounds'] is not None else 'N'}_{config['n_hops']}hop_single{config['is_single']}_fixedV{config['fixed_V'] is not None}_lambda{config.get('p_lambda')}"
     print("Computing LPCA:", out_path)
-    
+
     compute_encodings(data, k, out_path, 
-                      format_LPCA_encoding if fixed_k is None else format_LPCA_encoding_fixed, 
-                      bounds, None, n_hops, is_single, fixed_k)
+                      format_LPCA_encoding if config['fixed_V'] is None else format_LPCA_encoding_fixed, 
+                      config)
     

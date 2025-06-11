@@ -8,14 +8,6 @@ from scipy.special import expit
 from common import time_wrapper, measure_encoding_similarity
 
 
-def normalize_loss(loss1, loss2):
-    total = abs(loss1) + abs(loss2)
-    loss1_norm = loss1 / total
-    loss2_norm = loss2 / total
-
-    return 0.8 * loss1_norm + 0.2 * loss2_norm
-
-
 def similarity_loss(A, encodings):
     similarities = measure_encoding_similarity(A, encodings)
 
@@ -27,7 +19,7 @@ def similarity_loss(A, encodings):
     return loss
 
 
-def lpca_loss(factors, adj_s, rank, V_fixed=None, is_single=False, fixed_k=None):
+def lpca_loss(factors, adj_s, rank, config):
     """
       Calculates the loss used for optimizing the U, V decomposition.
       In the classic case, both U and V are optimized, where the 
@@ -43,12 +35,14 @@ def lpca_loss(factors, adj_s, rank, V_fixed=None, is_single=False, fixed_k=None)
                    into the desired shape based on the case (see above)
         adj_s:     graph adjacency matrix shifted -1's and +1's
         rank:      desired size of the matrices
-        V_fixed:   in the case of fixed optimization, the matrix that is fixed
-                   and from which the product with factors will be calculated
-                   to obtain the loss
-        is_single: indicator whether the factors only represent one matrix, 
-                   which is then transposed and multiplied with itself to 
-                   calculate the loss from
+        config:    dictionary with additional configurable parameters
+                   - fixed_V: in the case of fixed optimization, 
+                    the matrix that is fixed and from which the product 
+                    with factors will be calculated to obtain the loss
+                   - is_single: indicator whether the factors only represent one matrix, 
+                    which is then transposed and multiplied with itself to 
+                    calculate the loss from
+                   - p_lambda: parameter for combined loss weighting 
 
       Returns:
         int: calculated loss between the decomposed matrix and the adjacency matrix
@@ -58,67 +52,64 @@ def lpca_loss(factors, adj_s, rank, V_fixed=None, is_single=False, fixed_k=None)
 
     U = factors[:n*rank].reshape(n, rank)
     
-    if V_fixed is not None:
-        V = V_fixed
-    elif is_single:
+    if config["fixed_V"] is not None:
+        V = config["fixed_V"]
+    elif config["is_single"]:
         V = U.T
-    elif fixed_k is not None:
-        V = fixed_k @ U.T
     else:
         V = factors[n*rank:].reshape(rank, n) 
 
-    logits = U @ V[:, :n]
+    logits = U @ V
     prob_wrong = expit(-logits * adj_s)
     loss = (np.logaddexp(0,-logits*adj_s)).sum()# / n_element    
     U_grad = -(prob_wrong * adj_s) @ V[:, :n].T# / n_element
     V_grad = -U.T @ (prob_wrong * adj_s)# / n_element
 
-    sim_loss = 0
-    if fixed_k is not None:
-        sim_loss = similarity_loss(clip_01(adj_s), U)
+    if config["is_single"]:
+        U_grad = 2 * (-adj_s * prob_wrong) @ U
 
-    if V_fixed is not None or is_single or fixed_k is not None:
-        return loss + sim_loss, U_grad.flatten(), V_grad.flatten()
+    sim_loss = similarity_loss(clip_01(adj_s), np.hstack((U, V.T)))
 
-    return loss, np.concatenate((U_grad.flatten(), V_grad.flatten()))  
+    if config["fixed_V"] is not None or config["is_single"]:
+        return loss + config["p_lambda"] * sim_loss, U_grad.flatten()
+
+    return loss + config["p_lambda"] * sim_loss, np.concatenate((U_grad.flatten(), V_grad.flatten()))  
+
 
 clip_01 = lambda M : np.clip(M, a_min=0, a_max=1)
 
 @time_wrapper
 def decomposition_at_k(A, 
                        k, 
-                       save_path=None, 
-                       fixed_V=None, 
-                       max_iter=2000, 
-                       bounds=None, 
-                       is_single=False, 
-                       fixed_k=None):
+                       config,
+                       save_path=None):
     n, _ = A.shape
 
     # initalize uniformly on [-1,+1]
     size = 2*n*k
-    if fixed_V is not None or is_single or fixed_k is not None:
+    if config["fixed_V"] is not None or config["is_single"]:
         # only one matrix for optimization
         size = n*k
     factors = -1+2*np.random.random(size=size)
     
-    bounds_list = [bounds for _ in range(len(factors))] if bounds is not None else None
-    res = scipy.optimize.minimize(lambda x, adj_s, rank: lpca_loss(x, adj_s, rank, fixed_V, is_single, fixed_k), 
+    bounds_list = None
+    if config['bounds'] is not None:
+        bounds_list = [config['bounds'] for _ in range(len(factors))]
+    
+    res = scipy.optimize.minimize(lambda x, adj_s, rank: lpca_loss(x, adj_s, rank, config), 
                                   x0=factors, 
-                                  args=(-1 + 2*np.array(A.todense()), k), 
+                                  args=(-1 + 2*np.array(A.todense()), k),
                                   jac=True,
                                   method='L-BFGS-B',
-                                  options={'maxiter':max_iter},
+                                  options={'maxiter': config["max_iter"]},
                                   bounds=bounds_list)
     
     U = res.x[:n*k].reshape(n, k) 
 
-    if fixed_V is not None:
-        V = fixed_V
-    elif is_single:
+    if config["fixed_V"] is not None:
+        V = config["fixed_V"]
+    elif config["is_single"]:
         V = U.T
-    elif fixed_k is not None:
-        V = fixed_k @ U.T
     else:
         V = res.x[n*k:].reshape(k, n)
     
