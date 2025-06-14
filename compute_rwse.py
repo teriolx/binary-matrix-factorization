@@ -1,8 +1,7 @@
 import torch
-from torch_geometric.utils import (get_laplacian, to_scipy_sparse_matrix,
-                                   to_undirected, to_dense_adj, scatter)
+from torch_geometric.utils import (to_dense_adj, scatter)
 from torch_geometric.utils.num_nodes import maybe_num_nodes
-from compute_encodings import load_dataset
+from common import load_dataset
 import numpy as np
 
 
