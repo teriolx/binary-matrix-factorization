@@ -2,6 +2,8 @@ import time
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
+from torch_geometric.datasets import ZINC
+from torch_geometric.datasets import GNNBenchmarkDataset
 
 
 def construct_adjacency_matrix(data):
@@ -55,6 +57,21 @@ def measure_encoding_similarity(A, encodings):
     
     return similarity
 
+
+def load_dataset(name):
+    train, val, test = None, None, None
+    if name == "ZINC":
+        train = ZINC(subset=True, root='data', split='train')
+        val   = ZINC(subset=True, root='data', split='val')
+        test  = ZINC(subset=True, root='data', split='test')
+    elif name == "CIFAR":
+        train = GNNBenchmarkDataset(name='CIFAR10', root='data', split='train')
+        val   = GNNBenchmarkDataset(name='CIFAR10', root='data', split='val')
+        test  = GNNBenchmarkDataset(name='CIFAR10', root='data', split='test')    
+    
+    if train is not None and val is not None and test is not None:
+        return train + val + test 
+    return None
 
 
 if __name__ == "__main__":

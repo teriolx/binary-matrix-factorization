@@ -1,25 +1,44 @@
-from common import measure_encoding_similarity, construct_adjacency_matrix
-from torch_geometric.datasets import ZINC
+from common import measure_encoding_similarity, construct_adjacency_matrix, load_dataset
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
 import sys
+import matplotlib.pyplot as plt
+
+
+def plot_neighbourhood_similarity(df_path, title):
+    df = pd.read_parquet(df_path)
+    data = df.groupby("d")["sim"].agg(["mean", "std"])
+
+    plt.errorbar(data.index, data["mean"], yerr=data["std"], fmt='-o', capsize=0.2, capthick=1)
+    plt.xlabel("neighbourhood symmetric difference")
+    plt.ylabel("average distance between all distinct node encoding pairs")
+    plt.title(title)
+    
+    plt.show()
+
+
+def plot_diff_histogram(input_path, title):
+    plt.bar(*np.unique(pd.read_parquet(input_path)["d"], return_counts=True))
+    plt.title(title)
+    plt.xlabel("neighbourhood symmetric difference")
+    plt.ylabel("number of node pairs")
+    plt.show()
 
 
 if __name__ == "__main__":
-    train = ZINC(subset=True, root='data', split='train')
-    val = ZINC(subset=True, root='data', split='val')
-    test = ZINC(subset=True, root='data', split='test')
+    dataset_name = sys.argv[1]
+    dir_path = sys.argv[2]
+    file_name = sys.argv[3]
 
-    dir_path = sys.argv[1]
-    file_name = sys.argv[2]
-
+    data = load_dataset(dataset_name)
     encoding = np.load(dir_path + file_name + ".npz")
 
     results = []
 
-    for i in tqdm(range(len(train))):
-        sim_measures = measure_encoding_similarity(construct_adjacency_matrix(train[i]), encoding[f"idx_{i}"])
+    for i in tqdm(range(len(encoding))):
+        A = construct_adjacency_matrix(data[i])
+        sim_measures = measure_encoding_similarity(A, encoding[f"idx_{i}"])
         for d, similarities in sim_measures.items():
             for s in similarities:
                 results.append(
