@@ -46,9 +46,7 @@ def measure_encoding_similarity(A, encodings):
     n_nodes = A.shape[0]
 
     for v in range(n_nodes):
-        for w in range(n_nodes):
-            if v == w:
-                continue
+        for w in range(v+1, n_nodes):
             d = neighbourhood_symmetric_difference(A[v], A[w])
             
             if not d in similarity:

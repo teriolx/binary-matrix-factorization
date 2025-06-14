@@ -3,6 +3,7 @@ from torch_geometric.datasets import ZINC
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+import sys
 
 
 if __name__ == "__main__":
@@ -10,13 +11,14 @@ if __name__ == "__main__":
     val = ZINC(subset=True, root='data', split='val')
     test = ZINC(subset=True, root='data', split='test')
 
-    in_name = 'lpca_ZINC_32_b4_1hop_singleFalse_fixedKTrue'
+    dir_path = sys.argv[1]
+    file_name = sys.argv[2]
 
-    encoding = np.load("lpca_out/" + in_name + ".npz")
+    encoding = np.load(dir_path + file_name + ".npz")
 
     results = []
 
-    for i in tqdm(range(len(encoding))):
+    for i in tqdm(range(len(train))):
         sim_measures = measure_encoding_similarity(construct_adjacency_matrix(train[i]), encoding[f"idx_{i}"])
         for d, similarities in sim_measures.items():
             for s in similarities:
@@ -28,4 +30,4 @@ if __name__ == "__main__":
                     }
                 )
     
-    pd.DataFrame(results).to_parquet("similarity_test_" + in_name + '.parquet')
+    pd.DataFrame(results).to_parquet("similarity_res/similarity_" + file_name + '.parquet')
