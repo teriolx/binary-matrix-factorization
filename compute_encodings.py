@@ -23,13 +23,14 @@ def save_encodings(matrices, out_path):
     np.savez_compressed(out_path, **dict(zip(names, matrices)))
 
 
-def compute_encodings(data, k, out_path, format_fun, config, method="LPCA"):
+def compute_encodings(data, k, out_path, format_fun, config, method="LPCA",n_samples=None):
     matrices = {}
     results = []
 
     n_hops = config["n_hops"]
-
-    for i in tqdm(range(len(data))):
+    
+    idx_max = len(data) if n_samples is None else n_samples 
+    for i in tqdm(range(idx_max)):
         A = sp.sparse.csr_matrix(construct_adjacency_matrix(data[i]))
 
         while n_hops > 1:
@@ -106,9 +107,12 @@ if __name__ == "__main__":
     
     if len(sys.argv) > 7:
         config["p_lambda"] = float(sys.argv[7])
-
+    
     if len(sys.argv) > 8:
-        method = sys.argv[8]
+        n_samples = int(sys.argv[8])
+
+    if len(sys.argv) > 9:
+        method = sys.argv[9]
 
     # lb, ub = bounds
     # N = 40
@@ -129,5 +133,6 @@ if __name__ == "__main__":
     compute_encodings(data, k, out_path, 
                       format_LPCA_encoding if config['fixed_V'] is None else format_LPCA_encoding_fixed, 
                       config,
-                      method)
+                      method, 
+                      n_samples)
     
