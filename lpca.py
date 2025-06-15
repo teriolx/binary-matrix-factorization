@@ -60,6 +60,7 @@ def lpca_loss(factors, adj_s, rank, config):
         V = factors[n*rank:].reshape(rank, n) 
     
     if config["is_single"]:
+        print("here")
         A = clip_01(adj_s)
         T_0 = np.exp(-(A * (U).dot(U.T)))
         T_1 = (np.ones((n, n)) + T_0)
@@ -83,7 +84,9 @@ def lpca_loss(factors, adj_s, rank, config):
     U_grad = -((prob_wrong) * adj_s) @ V[:, :n].T# / n_element
     V_grad = -U.T @ (prob_wrong * adj_s)# / n_element
 
-    sim_loss = similarity_loss(clip_01(adj_s), np.hstack((U, V.T)))
+    sim_loss = 0
+    if config["p_lambda"] != 0:
+        sim_loss = similarity_loss(clip_01(adj_s), np.hstack((U, V.T)))
 
     if config["fixed_V"] is not None or config["is_single"]:
         assert loss + config["p_lambda"] * sim_loss == loss
