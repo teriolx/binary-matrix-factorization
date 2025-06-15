@@ -108,6 +108,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 7:
         config["p_lambda"] = float(sys.argv[7])
     
+    n_samples = None
     if len(sys.argv) > 8:
         n_samples = int(sys.argv[8])
 
