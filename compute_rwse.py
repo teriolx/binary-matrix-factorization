@@ -3,6 +3,7 @@ from torch_geometric.utils import (to_dense_adj, scatter)
 from torch_geometric.utils.num_nodes import maybe_num_nodes
 from common import load_dataset
 import numpy as np
+import sys
 
 
 
@@ -57,7 +58,8 @@ def get_rw_landing_probs(ksteps, edge_index, edge_weight=None,
 
 
 if __name__ == "__main__":
-    dataset = load_dataset("ZINC")
+    dataset_name = sys.argv[1]
+    dataset = load_dataset(dataset_name)
     times = list(range(1,21))
     matrices = {}
 
@@ -68,4 +70,4 @@ if __name__ == "__main__":
                                             num_nodes=N)
         matrices[f"idx_{i}"] = rw_landing
 
-    np.savez_compressed("rwse" + '.npz', **matrices)
+    np.savez_compressed("rwse_" + dataset_name + '.npz', **matrices)
