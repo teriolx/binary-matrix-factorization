@@ -2,8 +2,7 @@ import time
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
-from torch_geometric.datasets import ZINC
-from torch_geometric.datasets import GNNBenchmarkDataset
+from torch_geometric.datasets import ZINC, GNNBenchmarkDataset, LRGBDataset
 
 
 def construct_adjacency_matrix(data):
@@ -68,7 +67,11 @@ def load_dataset(name):
         train = GNNBenchmarkDataset(name='CIFAR10', root='data', split='train')
         val   = GNNBenchmarkDataset(name='CIFAR10', root='data', split='val')
         test  = GNNBenchmarkDataset(name='CIFAR10', root='data', split='test')    
-    
+    elif name == "Peptides":
+        train = LRGBDataset(name='Peptides-func', root='data', split='train')
+        val   = LRGBDataset(name='Peptides-func', root='data', split='val')
+        test  = LRGBDataset(name='Peptides-func', root='data', split='test')  
+
     if train is not None and val is not None and test is not None:
         return train + val + test 
     return None

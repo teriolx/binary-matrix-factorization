@@ -58,21 +58,37 @@ def lpca_loss(factors, adj_s, rank, config):
         V = U.T
     else:
         V = factors[n*rank:].reshape(rank, n) 
-
+    
+    if config["is_single"]:
+        A = clip_01(adj_s)
+        T_0 = np.exp(-(A * (U).dot(U.T)))
+        T_1 = (np.ones((n, n)) + T_0)
+        T_2 = (T_1 ** -1)
+        loss = -np.sum((np.log(T_2)).dot(np.ones(n)))
+        U_grad = -(np.ones(n) * 2)[:, np.newaxis] * (((((T_1 ** -2) * T_0) * A) / T_2).dot(U))
+        return loss, U_grad.flatten()
+    
+    # alternative gradient definitions
+    # A = adj_s
+    # T_0 = np.exp(-(A * (U).dot(V)))
+    # T_1 = (np.ones((n, n)) + T_0)
+    # T_2 = (T_1 ** -1)
+    # loss = -np.sum((np.log(T_2)).dot(np.ones(n)))
+    # U_grad = -(((((T_1 ** -2) * T_0) * A) / T_2)).dot(V.T)
+    # V_grad = -(U.T).dot(((((T_1 ** -2) * T_0) * A) / T_2))
+    
     logits = U @ V
     prob_wrong = expit(-logits * adj_s)
     loss = (np.logaddexp(0,-logits*adj_s)).sum()# / n_element    
-    U_grad = -(prob_wrong * adj_s) @ V[:, :n].T# / n_element
+    U_grad = -((prob_wrong) * adj_s) @ V[:, :n].T# / n_element
     V_grad = -U.T @ (prob_wrong * adj_s)# / n_element
-
-    if config["is_single"]:
-        U_grad = 2 * (-adj_s * prob_wrong) @ U
 
     sim_loss = similarity_loss(clip_01(adj_s), np.hstack((U, V.T)))
 
     if config["fixed_V"] is not None or config["is_single"]:
+        assert loss + config["p_lambda"] * sim_loss == loss
         return loss + config["p_lambda"] * sim_loss, U_grad.flatten()
-
+    
     return loss + config["p_lambda"] * sim_loss, np.concatenate((U_grad.flatten(), V_grad.flatten()))  
 
 
@@ -85,13 +101,15 @@ def decomposition_at_k(A,
                        save_path=None):
     n, _ = A.shape
 
-    # initalize uniformly on [-1,+1]
+
     size = 2*n*k
     if config["fixed_V"] is not None or config["is_single"]:
         # only one matrix for optimization
         size = n*k
-    factors = -1+2*np.random.random(size=size)
     
+    # initalize uniformly on [-1,+1]
+    factors = -1+2*np.random.random(size=size)
+
     bounds_list = None
     if config['bounds'] is not None:
         bounds_list = [config['bounds'] for _ in range(len(factors))]
@@ -101,7 +119,7 @@ def decomposition_at_k(A,
                                   args=(-1 + 2*np.array(A.todense()), k),
                                   jac=True,
                                   method='L-BFGS-B',
-                                  options={'maxiter': config["max_iter"]},
+                                  options={'maxiter': config["max_iter"]},     
                                   bounds=bounds_list)
     
     U = res.x[:n*k].reshape(n, k) 
@@ -114,9 +132,7 @@ def decomposition_at_k(A,
         V = res.x[n*k:].reshape(k, n)
     
     A_reconstructed = clip_01(U@V)
-
     frob_error_norm = np.linalg.norm(A_reconstructed[:,:n] - A) / sp.sparse.linalg.norm(A)
-
     data = {'U':U, 'V':V, 'A': A}
 
     if save_path is not None:

@@ -20,7 +20,6 @@ def error_at_k(A, k, error_func, t=0.5):
     B = (np.matmul(L, R) > t).astype(int)
     return error_func(A, B)
 
-
 def decomposition_at_k(A, k):
     svd = TruncatedSVD(n_components=k, n_iter=50, random_state=42)
 
@@ -29,8 +28,29 @@ def decomposition_at_k(A, k):
     return L, R
 
 
+def pad_A(A, k):
+    n = A.shape[0]
+    pad_width = ((0, k - n), (0, k - n))
+
+    return np.pad(A, pad_width, mode='constant', constant_values=0)
+
+
+def init_svd(k, n_iter=100, seed=0):
+    return TruncatedSVD(n_components=k, n_iter=n_iter, random_state=seed)
+
+
+@time_wrapper
+def decomposition_at_k_with_error(svd, A, k):
+    n = A.shape[0]
+    A_padded = pad_A(A, k) if n < k else A
+
+    L = svd.fit_transform(A_padded)[:n, :]
+    R = svd.components_[:, :n]
+    return error_func_frobenius(A, round(L, R)), L, R
+
+
 def round(L, R, t=0.5):
-    return (np.matmul(L, R) > t).astype(int)
+    return (L @ R > t).astype(int)
 
 
 @time_wrapper

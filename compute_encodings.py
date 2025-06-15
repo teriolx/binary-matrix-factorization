@@ -1,16 +1,18 @@
 import numpy as np
 import scipy as sp
 import pandas as pd
-from common import construct_adjacency_matrix
+from common import construct_adjacency_matrix, load_dataset
 from lpca import decomposition_at_k
 from tqdm import tqdm
-from torch_geometric.datasets import ZINC
-from torch_geometric.datasets import GNNBenchmarkDataset
 import sys
+from tSVD import decomposition_at_k_with_error, init_svd
 
+
+def stack_matrices_encoding(L, R):
+    return np.hstack((L, np.transpose(R)))
 
 def format_LPCA_encoding(data):
-    return np.hstack((data['U'], np.transpose(data['V'])))
+    return stack_matrices_encoding(data['U'], data['V'])
 
 def format_LPCA_encoding_fixed(data):
     return data['U']
@@ -21,7 +23,7 @@ def save_encodings(matrices, out_path):
     np.savez_compressed(out_path, **dict(zip(names, matrices)))
 
 
-def compute_encodings(data, k, out_path, format_fun, config):
+def compute_encodings(data, k, out_path, format_fun, config, method="LPCA"):
     matrices = {}
     results = []
 
@@ -33,9 +35,20 @@ def compute_encodings(data, k, out_path, format_fun, config):
         while n_hops > 1:
             A = A @ A
             n_hops -= 1
+        
 
-        t, error, nit, res = decomposition_at_k(A, k, config)
-        matrices[f"idx_{i}"] = format_fun(res)
+        if method == "LPCA":
+            A = sp.sparse.csr_matrix(construct_adjacency_matrix(data[i]))
+            t, error, nit, res = decomposition_at_k(A, k, config)
+            matrices[f"idx_{i}"] = format_fun(res)
+        elif method == "tSVD":
+            A = construct_adjacency_matrix(data[i])
+            t, error, L, R = decomposition_at_k_with_error(config["svd"], A, k)
+            nit = None
+            matrices[f"idx_{i}"] = stack_matrices_encoding(L, R)
+        else:
+            raise ValueError("unknown method")
+        
         results.append(
             {
                 "graph_id": i,
@@ -48,22 +61,6 @@ def compute_encodings(data, k, out_path, format_fun, config):
     
     np.savez_compressed(out_path + '.npz', **matrices)
     pd.DataFrame(results).to_parquet(out_path + '.parquet')
-
-
-def load_dataset(name):
-    train, val, test = None, None, None
-    if name == "ZINC":
-        train = ZINC(subset=True, root='data', split='train')
-        val   = ZINC(subset=True, root='data', split='val')
-        test  = ZINC(subset=True, root='data', split='test')
-    elif name == "CIFAR":
-        train = GNNBenchmarkDataset(name='CIFAR10', root='data', split='train')
-        val   = GNNBenchmarkDataset(name='CIFAR10', root='data', split='val')
-        test  = GNNBenchmarkDataset(name='CIFAR10', root='data', split='test')    
-    
-    if train is not None and val is not None and test is not None:
-        return train + val + test 
-    return None
 
 
 if __name__ == "__main__":
@@ -90,8 +87,11 @@ if __name__ == "__main__":
         "max_iter": 5000
     }
 
+    method="LPCA"
+
     if sys.argv[2].lower() != "none":
-        config["bounds"] = (-int(sys.argv[2]), sys.argv[2])
+        b = int(sys.argv[2])
+        config["bounds"] = (-b, b)
     
     k = int(sys.argv[3])
     
@@ -99,13 +99,16 @@ if __name__ == "__main__":
         config["n_hops"] = int(sys.argv[4])
 
     if len(sys.argv) > 5:
-        config["is_single"] = sys.argv[5]
+        config["is_single"] = sys.argv[5] == "True"
 
     if len(sys.argv) > 6 and sys.argv[6] == "True":
         config["fixed_V"] = -1+2*np.random.random(size=k*k).reshape((k, k))
     
     if len(sys.argv) > 7:
         config["p_lambda"] = float(sys.argv[7])
+
+    if len(sys.argv) > 8:
+        method = sys.argv[8]
 
     # lb, ub = bounds
     # N = 40
@@ -114,11 +117,17 @@ if __name__ == "__main__":
     #compute_encodings(data, 2, 'lpca_out/lpca2b_4_4', format_LPCA_encoding, bounds)
 
     # python compute_encodings.py ZINC 4 16 1 False True
+    
+    if method == "LPCA":
+        out_path = f"lpca_out/lpca_{name}_{k}_b{config['bounds'][1] if config['bounds'] is not None else 'N'}_{config['n_hops']}hop_single{config['is_single']}_fixedV{config['fixed_V'] is not None}_lambda{config.get('p_lambda')}"
+    else:
+        out_path = f"tsvd_out/tsvd_dim{k}"
+    print("Computing endocing:", out_path)
 
-    out_path = f"lpca_out/lpca_{name}_{k}_b{config['bounds'][1] if config['bounds'] is not None else 'N'}_{config['n_hops']}hop_single{config['is_single']}_fixedV{config['fixed_V'] is not None}_lambda{config.get('p_lambda')}"
-    print("Computing LPCA:", out_path)
-
+    if method == "tSVD":
+        config["svd"] = init_svd(k)
     compute_encodings(data, k, out_path, 
                       format_LPCA_encoding if config['fixed_V'] is None else format_LPCA_encoding_fixed, 
-                      config)
+                      config,
+                      method)
     
