@@ -6,6 +6,7 @@ import scipy as sp
 import scipy.io, scipy.optimize
 from scipy.special import expit
 from common import time_wrapper, measure_encoding_similarity
+from scipy.optimize import Bounds
 
 
 def similarity_loss(A, encodings):
@@ -113,9 +114,10 @@ def decomposition_at_k(A,
     # initalize uniformly on [-1,+1]
     factors = -1+2*np.random.random(size=size)
 
-    bounds_list = None
+    bounds = None
     if config['bounds'] is not None:
-        bounds_list = [config['bounds'] for _ in range(len(factors))]
+        lb, ub = config['bounds']
+        bounds = Bounds(lb, ub)
     
     res = scipy.optimize.minimize(lambda x, adj_s, rank: lpca_loss(x, adj_s, rank, config), 
                                   x0=factors, 
@@ -123,7 +125,7 @@ def decomposition_at_k(A,
                                   jac=True,
                                   method='L-BFGS-B',
                                   options={'maxiter': config["max_iter"]},     
-                                  bounds=bounds_list)
+                                  bounds=bounds)
     
     U = res.x[:n*k].reshape(n, k) 
 
