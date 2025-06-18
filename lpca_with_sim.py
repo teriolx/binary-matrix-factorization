@@ -54,7 +54,6 @@ def lpca_sim_loss(factors, adj_s, A, k, gamma=0.2):
     L_sim_grad = sim_grad(W, L)
     R_sim_grad = sim_grad(W, R.T).T
 
-    
     return l_loss + gamma * s_loss, np.concatenate((
         (L_lpca_grad + gamma * L_sim_grad).flatten(),
         (R_lpca_grad + gamma * R_sim_grad).flatten()

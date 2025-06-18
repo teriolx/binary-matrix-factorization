@@ -34,12 +34,13 @@ def compute_encodings(data, k, out_path, bound=None, gamma=0.5, n_samples=None):
     pd.DataFrame(results).to_parquet(out_path + '.parquet')
 
 if __name__ == "__main__":
+    # python lpca_with_sim_runner.py ZINC 4 8 10 1000
     name = sys.argv[1]
     data = load_dataset(name) 
     
     bound = None
     if sys.argv[2].lower() != "none":
-        b = int(sys.argv[2])
+        bound = int(sys.argv[2])
     
     k = int(sys.argv[3])
     gamma = float(sys.argv[4])
