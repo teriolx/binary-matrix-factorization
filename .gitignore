@@ -1,4 +1,6 @@
-__pycache__/*
-lpca_out/*
-data/*
-wandb/*
+__pycache__/
+lpca_out/
+data/
+wandb/
+results/
+output/similarity_res/*.parquet
