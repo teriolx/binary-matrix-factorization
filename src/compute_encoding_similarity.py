@@ -14,7 +14,8 @@ def plot_neighbourhood_similarity(df_path, title):
     plt.xlabel("neighbourhood symmetric difference")
     plt.ylabel("average distance between \n distinct node encoding pairs")
     plt.title(title)
-    
+    plt.ylim(0, 0.11)
+    plt.savefig("plot.png")
     plt.show()
 
 def plot_neighbourhood_similarity_multiple(df_paths, title):
