@@ -12,8 +12,22 @@ def plot_neighbourhood_similarity(df_path, title):
 
     plt.errorbar(data.index, data["mean"], yerr=data["std"], fmt='-o', capsize=0.2, capthick=1)
     plt.xlabel("neighbourhood symmetric difference")
-    plt.ylabel("average distance between all distinct node encoding pairs")
+    plt.ylabel("average distance between \n distinct node encoding pairs")
     plt.title(title)
+    
+    plt.show()
+
+def plot_neighbourhood_similarity_multiple(df_paths, title):
+    plt.rcParams.update({'font.size': 16})
+    for label, df_path in df_paths.items():
+        df = pd.read_parquet(df_path)
+        data = df.groupby("d")["sim"].agg(["mean", "std"])
+
+        plt.errorbar(data.index, data["mean"], yerr=data["std"], fmt='-o', capsize=0.2, capthick=1, label=label)
+    plt.xlabel("neighbourhood symmetric difference")
+    plt.ylabel("average distance between \n distinct node encoding pairs")
+    plt.title(title)
+    plt.legend()
     
     plt.show()
 
